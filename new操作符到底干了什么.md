@@ -1,6 +1,7 @@
 # new 操作符到底干了什么。
 前几天无意间发现了刚开始学JavaScript时在知乎写的一些回答，有一个就是讲new操作符到底干了什么。从现在的视角看我当时的回答虽然是正确的，但是在对原理的剖析和细节的理解上还相去甚远。所以借此机会，就想重新梳理一下这一年多来对new操作符理解的变化与成长。
 
+## 模拟new操作符
 第一次去了解new操作符，是在看《JS高级程序设计（第三版）》这本书时，P145是这样写到的。
 > 要创建Person的新实例，必须使用new操作符。以这种方式调用构造函数实际上会经历以下4个步骤：
 1. 创建一个新对象；
@@ -41,6 +42,8 @@ person1.sayName() // Uncaught TypeError: person1.sayName is not a function
 console.log(person1 instanceof Person) // false
 console.log(person1 instanceof Object) // true
 ```
+
+## 改进的模拟函数
 可见person1并不是Person的实例。当时的我还不知道问题出在哪里，直到学习到原型链时我才直到mockNew函数缺少了一个步骤，即绑定构造函数原型。所以person1实例是无法访问到Person原型中的sayName方法，同时`instanceof`操作符的结果也为`false`。因为`instanceof`操作符是用来检测一个对象在其原型链中是否存在一个构造函数的prototype属性的，而person1的原型链中并不存在Person.prototype，所以返回值为`false`。因此，我们改造mockNew函数如下：
 
 ```javascript
@@ -78,7 +81,9 @@ console.log(person1 instanceof Person) // false
 console.log(person2 instanceof Person) // true
 ```
 什么！！！用new操作符调用的Person构造函数并没有按照预期返回带有name属性并且在Person.prototype上的对象，而是返回了我们手动return的带有age属性的对象，但是我们的mockNew函数是正常返回了。所以我们的mockNew函数中肯定又丢失了一些细节，为了弄清楚，只好硬着头皮去读[ECMA-262](https://www.ecma-international.org/ecma-262/6.0/#sec-new-operator)规范了。看到规范中的steps后才恍然大悟了new操作符的整个执行流程。
-![new-oprato](media/15311280174159/new-oprator.png)
+![](https://ws1.sinaimg.cn/large/0070gOERly1ftak8o3zuej319g0jg45u.jpg)
+
+## 完善模拟函数
 简单来说我们在返回对象前缺失了判断返回值类型的步骤。
 * 如果构造函数的返回值是值类型，那么就丢弃掉，依然返回构造函数创建的实例。
 * 如果构造函数的返回值是引用类型，那么就返回这个引用类型，丢弃构造函数创建的实例。
@@ -90,7 +95,8 @@ console.log(person2 instanceof Person) // true
 ```javascript
 function mockNew (constructor, ...args) {
   const isPrimitive = result => {
-    // 这里就是判断如果是
+    // 如果result为值类型则返回true
+    // 如果result为引用类型则返回false    
   }
 
   const o = Object.create(constructor.prototype)
@@ -101,4 +107,5 @@ function mockNew (constructor, ...args) {
 ```
 这时的mockNew函数可以说是较好的模拟了new操作符的功能。
 
-其实new操作符就是一个语法糖。在传统的面向类的语言中，“构造函数”是类中的一些特殊方法，使用new初始化类时会调用类中的构造函数。而JavaScript中的new其实是用来告诉函数，我要以“构造”的方式调用你了，从而向mockNew函数中的流程一样，得到我们的实例。
+## 总结
+其实new操作符就是一个语法糖。在传统的面向类的语言中，“构造函数”是类中的一些特殊方法，使用new初始化类时会调用类中的构造函数。而JavaScript中的new其实是用来告诉函数，我要以“构造”的方式调用你了，从而向mockNew函数中的流程一样，得到我们的实例。所以本质上来说JS是没有所谓`构造函数`的，有的应该是`构造调用`。这样的称呼能让我们更清楚认识JS中的new操作符。
